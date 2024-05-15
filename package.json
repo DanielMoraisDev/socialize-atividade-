@@ -4,11 +4,17 @@
   "description": "",
   "main": "index.js",
   "type": "module",
-    "scripts": {
+  "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "nodemon ./server.js"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "formidable": "^3.5.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
 }

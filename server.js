@@ -1,11 +1,12 @@
 import fs from "node:fs"
 import http from "node:http"
+import formidable from "formidable"
 import { type } from "node:os"
 
 const locationDataBase = "./users.json"
 const PORT = 8081 || 3333
 
-const server = http.createServer((req, res) => {
+http.createServer((req, res) => {
     const { method, url } = req
 
     const protocolResponse = (status) => {
@@ -67,14 +68,16 @@ const server = http.createServer((req, res) => {
         }
 
         const createUser = (data) => {
-            const newUser = JSON.parse(data)
+            let newUser = JSON.parse(data)
             const verifyUser = verifyUserRegister(newUser.email)
             if (verifyUser == undefined) {
-                newUser.date = getDate()
-                newUser.bio = null
-                newUser.imageProfile = null
-                newUser.id = String(jsonData.length + 1)
-                if (newUser.id && newUser.nome && newUser.email && newUser.senha) {
+                newUser.perfil.date = getDate()
+                newUser.perfil.bio = null
+                newUser.perfil.imageProfile = null
+                const id = newUser.id = String(jsonData.length + 1)
+                delete newUser.id
+                newUser = { id, ...newUser }
+                if (newUser.id && newUser.nome && newUser.perfil.nomePerfil && newUser.perfil.email && newUser.senha) {
                     jsonData.push(newUser)
                     addInFile(newUser)
                 } else {
@@ -122,7 +125,7 @@ const server = http.createServer((req, res) => {
             if (index !== -1) {
                 const updatedUser = JSON.parse(data)
                 if (!data.id) {
-                    updatedUser.lastUpdate = getDate()
+                    updatedUser.perfil.lastUpdate = getDate()
                     jsonData[index] = { ...jsonData[index], ...updatedUser }
                     addInFile(jsonData)
                     protocolResponse(200)
@@ -136,25 +139,40 @@ const server = http.createServer((req, res) => {
                 messageResponse("Index inválido")
             }
         }
+        
+        const getBinaryImg = async (urlID) => {
+            const form = formidable({})
 
-        const updateUserImage = (data, urlID) => {
+            let fields;
+    
+            try {
+                [fields] = await form.parse(req)
+                updateUserImage(fields, urlID)
+            } catch (err) {
+                res.writeHead(500, { "Content-Type": "application/json" })
+                res.end(JSON.stringify({ message: "Error ao enviar os dados" }))
+                return
+            }
+    
+            fs.rename(fields.file[0].filepath, `img/${fields.file[0].newFilename}.png`, (err) => {
+                if (err) {
+                    res.writeHead(500, { "Content-Type": "application/json" })
+                    res.end(JSON.stringify({ message: "Error ao enviar os dados" }))
+                    return
+                }
+            })
+            return 
+        }
+
+        const updateUserImage = (imageJson, urlID) => {
             const index = jsonData.findIndex(e => e.id == urlID)
             if (index !== -1) {
-                const userBody = JSON.parse(data)
-                if (!userBody.id && !userBody.userBody && !userBody.nome && !userBody.senha && !userBody.email && !userBody.bio && !userBody.lastUpdate) {
-                   if (userBody.imageProfile !== "") {
-                    jsonData[index] = { ...jsonData[index], ...userBody}
-                    addInFile(jsonData)
-                    protocolResponse(200)
-                    messageResponse(jsonData[index])
-                   } else {
-                    protocolResponse(500)
-                    messageResponse("Você não colocou nenhum endereço para a imagem")
-                   }
-                } else {
-                    protocolResponse(500)
-                    messageResponse("Você pode atualizar apenas a imagem")
-                }
+
+                console.log(imageJson.file)
+                // jsonData[index] = { ...jsonData[index].perfil }
+                addInFile(jsonData)
+                protocolResponse(200)
+                messageResponse(jsonData[index])
             } else {
                 protocolResponse(500)
                 messageResponse("Index inválido")
@@ -173,15 +191,15 @@ const server = http.createServer((req, res) => {
             jsonBodyReceive(createUser)
         } else if (method === "POST" && url === "/login") {
             jsonBodyReceive(userLogin)
-        } else if (method === "GET" && url.startsWith("/perfil/")) {
+       } else if (method === "GET" && url.startsWith("/perfil/")) {
             const urlID = url.split("/")[2]
             getUserProfile(urlID)
         } else if (method === "PUT" && url.startsWith("/perfil/")) {
             const urlID = url.split("/")[2]
             jsonBodyReceive(updateUserProfile, urlID)
-        } else if (method === "POST" && url.startsWith("/perfil/imagem/")) {
+        } if (method === "POST" && url.startsWith("/perfil/imagem/")) {
             const urlID = url.split("/")[3]
-            jsonBodyReceive(updateUserImage, urlID)
+            getBinaryImg(urlID)
         } else {
             protocolResponse(500)
             messageResponse("Essa rota não existe")
